@@ -54,10 +54,6 @@ class UserLeaveRequestController extends Controller
             ->get();
         
         //dd($leaveTypesCount); 
-        //print_r($userWallet[0]->total_balance); 
-        //print_r($userWallet[1]->total_balance); 
-        //exit;
-        // Open a try/catch block
         try {
             // Begin a transaction
             DB::beginTransaction();
@@ -99,53 +95,5 @@ class UserLeaveRequestController extends Controller
             // and throw the error again.
             throw $e;
         }
-        
-        /*
-        foreach($userWallet as $key => $leaveCount){
-            if($leaveCount->total_balance >= $leaveTypesCount[$key]){
-                //echo 'Leave Allowed';
-                //Now add the data in user_leave_requests table
-                //And then add the data in user_transactions table
-                //And Finaly update the user_leave_wallet table
-                
-                $userLeaveRequestData = ([
-                    'user_id' => Auth::id(),
-                    'start_date' => $request->start_date,
-                    'end_date' => $request->end_date,
-                    'reason' => $request->reason
-                ]);
-                $UserLeaveRequest = UserLeaveRequest::create($userLeaveRequestData);
-                //dd($UserLeaveRequest->id);
-                foreach ($request->leaveData as $leave){
-                    $userLeaveRequestTransactionData = ([
-                        'user_id' => Auth::id(),
-                        'request_id' => $UserLeaveRequest->id,
-                        'leave_id' => $leave['leave_type'],
-                        'count' => (float) $leave['leave_type_count']
-                    ]);
-                    
-                    $UserLeaveTransaction = UserTransaction::create($userLeaveRequestTransactionData);
-                }
-                
-                //foreach($userWallet as $key => $userWalletData){
-                    foreach ($request->leaveData as $leave){
-                        if($leaveCount->leave_id == $leave['leave_type']){
-                            $leaveCount->update(['user_id' => Auth::id(),
-                                'leave_id' => $leave['leave_type'],
-                                'total_balance' => $leaveCount->total_balance - $leave['leave_type_count']  
-                            ]);
-                        }
-                    }
-                //}
-                
-                return redirect()->route('users.index')
-                        ->with('success','Leave Request added successfully.');   
-            } else {
-                //Flash::error(__('Leave Not Allowed. Your leave balance is exhausted'));
-                //return redirect(route('userleaves.create'));
-                return redirect(url('userleaves/create'));
-            }
-        }
-        */
     }
 }
