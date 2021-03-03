@@ -1,0 +1,25 @@
+{
+    "name": "itaind/hrmspkg",
+    "description": "ITAIND In-house HRMS package",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Sunil Ghate",
+            "email": "sunil.82ghate@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "autoload": {
+        "psr-4": {
+            "ITAIND\\HRMSPKG\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "ITAIND\\HRMSPKG\\HRMSServiceProvider"
+            ]
+        }
+    }
+}
