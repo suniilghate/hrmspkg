@@ -10,6 +10,7 @@ use ITAIND\HRMSPKG\Models\UserLeaveWallet;
 use Illuminate\Support\Facades\Auth;
 use ITAIND\HRMSPKG\Models\UserLeaveRequest;
 use ITAIND\HRMSPKG\Models\UserTransaction;
+use Illuminate\Support\Facades\DB;
 
 //use Flash;
 
@@ -39,7 +40,7 @@ class UserLeaveRequestController extends Controller
      */
     public function save(CreateUserLeaveRequest $request)
     {
-        //print '<pre/>'; print_r($_POST); exit;
+        //print '<pre/>'; print_r($_POST); //exit;
         $leaveTypesId = implode(',', array_map(function($value){
             return trim($value['leave_type'], ',');
         }, $request->leaveData));
@@ -52,7 +53,54 @@ class UserLeaveRequestController extends Controller
             ->whereIn('leave_id', explode(',', $leaveTypesId))
             ->get();
         
-        //dd($leaveTypesCount);    
+        //dd($leaveTypesCount); 
+        //print_r($userWallet[0]->total_balance); 
+        //print_r($userWallet[1]->total_balance); 
+        //exit;
+        // Open a try/catch block
+        try {
+            // Begin a transaction
+            DB::beginTransaction();
+            $UserLeaveRequest = UserLeaveRequest::create([
+                'user_id' => Auth::id(),
+                'start_date' => $request->start_date,
+                'end_date' => $request->end_date,
+                'reason' => $request->reason
+            ]);
+            foreach ($request->leaveData as $key => $leave){
+                if($userWallet[$key]->total_balance >= $leaveTypesCount[$key]){
+                    $UserLeaveTransaction = UserTransaction::create([
+                        'user_id' => Auth::id(),
+                        'request_id' => $UserLeaveRequest->id,
+                        'leave_id' => $leave['leave_type'],
+                        'count' => (float) $leave['leave_type_count']
+                    ]);
+                    if($userWallet[$key]->leave_id == $leave['leave_type']){
+                        $userWallet[$key]->update(['user_id' => Auth::id(),
+                            'leave_id' => $leave['leave_type'],
+                            'total_balance' => $userWallet[$key]->total_balance - $leave['leave_type_count']  
+                        ]);
+                    }
+                } else {
+                    DB::rollback();
+                    //Flash::error(__('Leave Not Allowed. Your leave balance is exhausted'));
+                    //return redirect(route('userleaves.create'));
+                    return redirect(url('userleaves/create'));
+                }    
+            }
+            // Commit the transaction
+            DB::commit();
+            
+            return redirect()->route('users.index')
+                        ->with('success','Leave Request added successfully.');
+        } catch (\Exception $e) {
+            // An error occured; cancel the transaction...
+            DB::rollback();
+            // and throw the error again.
+            throw $e;
+        }
+        
+        /*
         foreach($userWallet as $key => $leaveCount){
             if($leaveCount->total_balance >= $leaveTypesCount[$key]){
                 //echo 'Leave Allowed';
@@ -79,16 +127,16 @@ class UserLeaveRequestController extends Controller
                     $UserLeaveTransaction = UserTransaction::create($userLeaveRequestTransactionData);
                 }
                 
-                foreach($userWallet as $key => $userWalletData){
+                //foreach($userWallet as $key => $userWalletData){
                     foreach ($request->leaveData as $leave){
-                        if($userWalletData->leave_id == $leave['leave_type']){
-                            $userWalletData->update(['user_id' => Auth::id(),
+                        if($leaveCount->leave_id == $leave['leave_type']){
+                            $leaveCount->update(['user_id' => Auth::id(),
                                 'leave_id' => $leave['leave_type'],
-                                'total_balance' => $userWalletData->total_balance - $leave['leave_type_count']  
+                                'total_balance' => $leaveCount->total_balance - $leave['leave_type_count']  
                             ]);
                         }
                     }
-                }
+                //}
                 
                 return redirect()->route('users.index')
                         ->with('success','Leave Request added successfully.');   
@@ -98,5 +146,6 @@ class UserLeaveRequestController extends Controller
                 return redirect(url('userleaves/create'));
             }
         }
+        */
     }
 }
