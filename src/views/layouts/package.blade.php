@@ -77,6 +77,7 @@
         </nav>
 
         <main class="py-4">
+            @extends('hrms::menu')
             @yield('content')
         </main>
     </div>
