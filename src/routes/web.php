@@ -23,4 +23,6 @@ Route::group(['namespace' => 'ITAIND\HRMSPKG\Http\Controllers', 'middleware' => 
     Route::get('/userleaves/myleaves-details/{id}', 'UserLeaveRequestController@myleaves_details');
     Route::get('/userleaves/balance-leaves', 'UserLeaveRequestController@balance_leaves');
     Route::get('/userleaves/pendingleaves', 'UserLeaveRequestController@pendingleaves');
+    Route::get('/userleaves/reject/{id}', 'UserLeaveRequestController@rejectLeaves');
+    Route::get('/userleaves/approve/{id}', 'UserLeaveRequestController@approveLeaves');
 });

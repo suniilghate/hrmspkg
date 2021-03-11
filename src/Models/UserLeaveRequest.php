@@ -14,6 +14,11 @@ class UserLeaveRequest extends Model
         'start_date',
         'end_date',
         'reason',
+        'status',
+        'approved_by',
+        'approved_on',
+        'rejected_by',
+        'rejected_on',
         'created_by',
         'updated_by'
     ];

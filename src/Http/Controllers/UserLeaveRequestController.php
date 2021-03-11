@@ -56,14 +56,101 @@ class UserLeaveRequestController extends Controller
     }
 
     public function pendingleaves(){
-        $pendingLeaves = UserLeaveRequest::join('users', 'user_leave_requests.user_id', '=', 'users.id')
+        $perPage = (env('PAGINATION')) ? env('PAGINATION') : 10;
+        $iReportingLeader = UserLeaveRequest::join('user_details', 'user_leave_requests.user_id', '=', 'user_details.user_id')
+                                ->where('user_leave_requests.status', '=', 1)
+                                ->select('user_details.reporting_teamleader as teamleader')
+                                ->get()->first()->toArray();
+        //dd($iReportingLeader);                                    
+        if($iReportingLeader['teamleader'] == Auth::id()){
+            $pendingLeaves = UserLeaveRequest::join('users', 'user_leave_requests.user_id', '=', 'users.id')
                         ->join('user_transactions', 'user_leave_requests.id', '=', 'user_transactions.request_id')
                         ->where('user_leave_requests.status', '=', 1)
-                        ->select(['users.name', DB::raw("count(user_transactions.count) as total"), 'user_leave_requests.start_date', 'user_leave_requests.end_date', 'user_leave_requests.status'])
+                        ->select(['users.name', DB::raw("count(user_transactions.count) as no_of_days"), 'user_leave_requests.id as leave_id','user_leave_requests.start_date', 'user_leave_requests.end_date', 'user_leave_requests.status'])
                         ->groupBy(['user_transactions.user_id'])
-                        ->get();
-        dd($pendingLeaves);                
+                        ->get();;
+                        //->simplePaginate($perPage);
+            //dd($pendingLeaves);                
+            return view('hrms::userleaves.pending-approval-leaves', compact('pendingLeaves'));
+        } else {
+            return redirect()->route('users.index')
+                        ->with('success','You are not Authorize');
+        }
+    }
 
+    public function approveLeaves($id = null) {
+        $iReportingLeader = UserLeaveRequest::join('user_details', 'user_leave_requests.user_id', '=', 'user_details.user_id')
+                                ->where('user_leave_requests.id', '=', $id)
+                                ->select('user_details.reporting_teamleader as teamleader', 'user_leave_requests.user_id as user', 'user_leave_requests.id as request_id')
+                                ->get()->first()->toArray();
+        if($iReportingLeader['teamleader'] == Auth::id()){
+            $userLeaveRequest = UserLeaveRequest::where('id', '=', $id)->first();
+            //dd($userLeaveRequest);
+            $tdate = date('Y-m-d H:i:s');
+            $leaveRequestData = ([
+                'status' => 3,
+                'approved_by' => Auth::id(),
+                'approved_on' => $tdate
+            ]);
+            $approveLeaveStatus = $userLeaveRequest->update($leaveRequestData);
+            
+            if($approveLeaveStatus){
+                //Notify User for leave approval
+                $userInfo = User::find($iReportingLeader['user']);
+                $userInfoData = [
+                    'name' => 'Dear ' . $userInfo->name . ',',
+                    'body' => 'Your leave from has been approved',
+                    'thanks' => 'Thank you',
+                    'leaveText' => 'Check your leave status here',
+                    'leaveUrl' => url('userleaves/myleaves/' . $iReportingLeader['request_id']),
+                    'leave_id' => $iReportingLeader['request_id']
+                ];
+                $userInfo->notify(new LeavesNotification($userInfoData));
+
+                return redirect()->route('users.index')
+                        ->with('success','Leave Approved');
+            }
+        } else {
+            return redirect()->route('users.index')
+                        ->with('success','You are not Authorize');
+        }
+    }
+
+    public function rejectLeaves($id = null) {
+        $iReportingLeader = UserLeaveRequest::join('user_details', 'user_leave_requests.user_id', '=', 'user_details.user_id')
+                                ->where('user_leave_requests.id', '=', $id)
+                                ->select('user_details.reporting_teamleader as teamleader', 'user_leave_requests.user_id as user', 'user_leave_requests.id as request_id')
+                                ->get()->first()->toArray();
+        if($iReportingLeader['teamleader'] == Auth::id()){
+            $userLeaveRequest = UserLeaveRequest::where('id', '=', $id)->first();
+            //dd($userLeaveRequest);
+            $tdate = date('Y-m-d H:i:s');
+            $leaveRequestData = ([
+                'status' => 4,
+                'rejected_by' => Auth::id(),
+                'rejected_on' => $tdate
+            ]);
+            $approveLeaveStatus = $userLeaveRequest->update($leaveRequestData);
+            if($approveLeaveStatus){
+                //Notify User for leave rejection
+                $userInfo = User::find($iReportingLeader['user']);
+                $userInfoData = [
+                    'name' => 'Dear ' . $userInfo->name . ',',
+                    'body' => 'Your leave from has been rejected',
+                    'thanks' => 'Thank you',
+                    'leaveText' => 'Check your leave status here',
+                    'leaveUrl' => url('userleaves/myleaves/' . $iReportingLeader['request_id']),
+                    'leave_id' => $iReportingLeader['request_id']
+                ];
+                $userInfo->notify(new LeavesNotification($userInfoData));
+
+                return redirect()->route('users.index')
+                        ->with('success','Leave Rejected');
+            }
+        } else {
+            return redirect()->route('users.index')
+                        ->with('success','You are not Authorize');
+        }
     }
 
     /**
@@ -74,7 +161,7 @@ class UserLeaveRequestController extends Controller
      */
     public function save(CreateUserLeaveRequest $request)
     {
-        //print '<pre/>'; //print_r($_POST); //exit;
+        //print '<pre/>'; print_r($_POST); //exit;
         $leaveTypesId = implode(',', array_map(function($value){
             return trim($value['leave_type'], ',');
         }, $request->leaveData));
@@ -86,8 +173,7 @@ class UserLeaveRequestController extends Controller
         $userWallet = UserLeaveWallet::where([['user_id', '=', Auth::id()]])
             ->whereIn('leave_id', explode(',', $leaveTypesId))
             ->get();
-        
-        //dd($leaveTypesCount); 
+        //dd($userWallet); 
         try {
             // Begin a transaction
             DB::beginTransaction();
@@ -120,6 +206,9 @@ class UserLeaveRequestController extends Controller
                 }    
             }
             
+            // Commit the transaction
+            DB::commit();
+
             //Notify User for leave
             $userInfo = User::find(Auth::id());
             $userInfoData = [
@@ -145,9 +234,6 @@ class UserLeaveRequestController extends Controller
             ];
             $leaderInfo->notify(new LeavesNotification($leaderInfoData));
 
-            // Commit the transaction
-            DB::commit();
-            
             return redirect()->route('users.index')
                         ->with('success','Leave Request added successfully.');
         } catch (\Exception $e) {
